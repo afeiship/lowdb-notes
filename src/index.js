@@ -1,13 +1,39 @@
 const express = require('express');
 const bodyParser = require('body-parser');
+const low = require('lowdb');
+const FileAsync = require('lowdb/adapters/FileAsync');
+const shortid = require('shortid');
 
+// Create server
 const app = express();
-
 app.use(bodyParser.json());
-app.get('/favicon.ico', (req, res) => res.status(204));
 
+// Create database instance and start server
+const adapter = new FileAsync('./src/db.json');
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`app running on port ${PORT}`);
-});
+low(adapter)
+  .then((db) => {
+    // Routes
+    // GET /posts/:id
+    app.get('/posts/:id', (req, res) => {
+      const post = db.get('posts').find({ id: req.params.id }).value();
+
+      res.send(post);
+    });
+
+    // POST /posts
+    app.post('/posts', (req, res) => {
+      db.get('posts')
+        .push(req.body)
+        .last()
+        .assign({ id: shortid() })
+        .write()
+        .then((post) => res.send(post));
+    });
+
+    // Set db default values
+    return db.defaults({ posts: [] }).write();
+  })
+  .then(() => {
+    app.listen(5000, () => console.log('listening on port 5000'));
+  });
